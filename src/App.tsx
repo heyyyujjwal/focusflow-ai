@@ -1,5 +1,6 @@
 import { useTasks } from './hooks/useTasks';
 import Dashboard from './components/Dashboard';
+import StudyPlanner from './components/StudyPlanner';
 import TaskForm from './components/TaskForm';
 import FilterBar from './components/FilterBar';
 import TaskList from './components/TaskList';
@@ -51,6 +52,8 @@ export default function App() {
           completed={stats.completed}
           progress={stats.progress}
         />
+
+        <StudyPlanner tasks={tasks} />
 
         <TaskForm
           editingTask={editingTask}

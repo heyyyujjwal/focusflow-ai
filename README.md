@@ -1,129 +1,160 @@
-# FocusFlow – AI-Powered Study Planner
+# FocusFlow — AI-Powered Study Planner
 
-A modern, responsive study planner dashboard built with **React**, **TypeScript**, and **Vite** as part of a Frontend AI Engineering assignment.
+FocusFlow is a responsive study-planning application built with React, TypeScript, and Vite. It helps students organize tasks, track progress, and generate AI-powered study plans based on their current tasks and available study time.
 
----
+**Live application:** https://focusflow-ai-xi.vercel.app
 
 ## Features
 
-- **Dashboard** – live counts of total, active, and completed tasks with an animated progress bar
-- **Task management** – add, edit, complete, and delete tasks
-- **Priority levels** – Low / Medium / High with colour-coded left borders and badges
-- **Due dates** – optional; overdue tasks are highlighted with a warning
-- **Filters** – All · Active · Completed tabs with per-filter counts
-- **Search** – real-time title search with a one-click clear button
-- **Persistence** – all tasks saved to `localStorage`; survive page refreshes
-- **Sample tasks** – five pre-loaded tasks on first run so the UI is never empty
-- **Accessible** – ARIA labels, keyboard focus indicators, live regions, and form error announcements
-- **Responsive** – works on desktop and mobile
+- **Dashboard:** View total, active, and completed tasks with overall progress.
+- **Task management:** Add, edit, complete, and delete tasks.
+- **Priority and deadlines:** Assign low, medium, or high priority and optional due dates.
+- **Search and filters:** Find tasks and filter by all, active, or completed status.
+- **Persistent storage:** Save task data in browser localStorage.
+- **AI Study Plan:** Generate a prioritized, timed study plan from active tasks using the Gemini API.
+- **Input validation:** Validate study hours and API request data.
+- **Loading and error states:** Provide feedback during generation and when requests fail.
+- **Responsive interface:** Support desktop and mobile layouts.
+- **Accessibility considerations:** Use form labels, keyboard focus indicators, and appropriate status feedback.
 
----
+## Technology Stack
 
-## Tech Stack
+- React 19
+- TypeScript
+- Vite
+- Plain CSS
+- Google Gemini API through the `@google/genai` SDK
+- Vercel serverless functions
+- Vitest and React Testing Library
+- Oxlint
 
-| Layer | Choice |
-|---|---|
-| Framework | React 18 + TypeScript |
-| Build tool | Vite 6 |
-| Styling | Plain CSS with CSS custom properties |
-| State | `useState`, `useEffect`, `useCallback` (no external state library) |
-| Persistence | Browser `localStorage` |
-| Font | Inter via Google Fonts |
+## Getting Started
 
----
+### Prerequisites
 
-## Installation
+Install Node.js (LTS recommended) and npm. A Google Gemini API key and a Vercel account are needed to run the AI endpoint locally and deploy the application.
+
+### Installation
+
+Clone the repository or open the project folder, then install dependencies:
 
 ```bash
-# 1. Clone / enter the project folder
-cd focusflow-ai
-
-# 2. Install dependencies
 npm install
 ```
 
----
+### Environment Variables
 
-## Running Locally
+Create a `.env.local` file in the project root and add your Gemini API key:
 
-```bash
-npm run dev
+```dotenv
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.  
-The dev server supports hot-module replacement (HMR) so changes appear instantly.
+Replace the placeholder with your own key. Never commit real API keys to GitHub or expose them in frontend code.
 
----
+The `.env.local` file is intended for local configuration. The Gemini key must remain server-side and must not use a `VITE_` prefix.
 
-## Production Build
+### Run Locally
 
-```bash
-npm run build
-```
-
-Output goes to the `dist/` folder.  
-Preview the production build locally:
+Start the Vercel development environment so the frontend and serverless API are available together:
 
 ```bash
-npm run preview
+npx vercel dev
 ```
 
----
+Open the local URL displayed in the terminal, usually `http://localhost:3000`.
 
-## Type Check
+The standard Vite command `npm run dev` starts the frontend only and does not, by itself, run the Vercel API function.
+
+## AI Study Plan API
+
+The application uses the server-side endpoint:
+
+`POST /api/study-plan`
+
+The frontend sends the current tasks and available study hours. Each task includes an ID, title, subject, priority, and completion status, with an optional due date.
+
+Example request:
+
+```json
+{
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "Review TypeScript",
+      "subject": "Programming",
+      "priority": "high",
+      "completed": false
+    }
+  ],
+  "availableHours": 2
+}
+```
+
+The endpoint validates the request, excludes completed tasks from planning, calls Gemini, and validates the generated plan before returning it.
+
+A successful response contains a `plan` array and a `summary`. Plan items include the associated task ID, title, subject, allocated minutes, rationale, and suggested order.
+
+Invalid requests and generation failures return an error response. The API key is accessed by the server and is not sent to the browser.
+
+## Quality Checks
+
+Run the automated tests:
 
 ```bash
-npm run build   # runs tsc -b (full compile) then vite build — type errors will fail the build
+npm test
 ```
 
-To type-check without producing a bundle:
-
-```bash
-npx tsc --noEmit
-```
-
----
-
-## Lint
+Run lint:
 
 ```bash
 npm run lint
 ```
 
----
+Create a production build:
 
-## Project Structure
-
-```
-focusflow-ai/
-├── index.html                  # HTML entry point (sets title, loads Inter font)
-├── vite.config.ts              # Vite configuration (default react plugin)
-├── tsconfig.json               # TypeScript configuration
-├── package.json
-├── src/
-│   ├── main.tsx                # React DOM entry point
-│   ├── App.tsx                 # Root component – composes all sections
-│   ├── index.css               # All styles (design tokens + component rules)
-│   ├── types.ts                # Shared TypeScript types (Task, Priority, FilterType)
-│   ├── utils.ts                # Helpers: generateId, formatDate, isOverdue, SAMPLE_TASKS
-│   ├── hooks/
-│   │   └── useTasks.ts         # Custom hook: state, localStorage sync, CRUD, filter/search
-│   └── components/
-│       ├── Dashboard.tsx       # Stat cards + progress bar
-│       ├── TaskForm.tsx        # Controlled add/edit form with validation
-│       ├── FilterBar.tsx       # Filter tabs + search input
-│       ├── TaskCard.tsx        # Single task row with actions
-│       └── TaskList.tsx        # List renderer + empty state
-├── README.md
-├── PROMPTS.md
-└── AI_WORKFLOW.md
+```bash
+npm run build
 ```
 
----
+The build runs TypeScript project compilation followed by the Vite production build.
 
-## Key Design Decisions
+### Verified Results
 
-- **Single CSS file** – kept intentionally flat and auditable; no CSS modules or Tailwind.
-- **`useTasks` hook** – all business logic lives in one place; components are pure presentational.
-- **No router** – single-page layout; filter state drives what renders.
-- **No external UI library** – every element is hand-crafted for full transparency.
+The following checks passed during local development:
+
+- 14 automated tests passed across two test files.
+- Lint completed with zero warnings and zero errors.
+- The production build completed successfully.
+- The AI Study Plan was tested in the browser using the local Vercel development server.
+- The deployed application and AI Study Plan were manually tested on the production URL.
+
+Lighthouse scores and accessibility audit results should be recorded separately after the audits are run.
+
+## Deployment
+
+The application is deployed on Vercel:
+
+https://focusflow-ai-xi.vercel.app
+
+To deploy a production build using the Vercel CLI:
+
+```bash
+npx vercel --prod
+```
+
+Configure `GEMINI_API_KEY` in the Vercel project settings for the Production environment. Keep the variable secret and redeploy after changing production environment variables.
+
+After deployment, verify that the dashboard loads, task management works, and AI Study Plan generation returns a valid plan.
+
+## Security and Limitations
+
+- Never commit `.env.local` or real API credentials.
+- Keep the Gemini API key in server-side environment variables.
+- Validate both incoming requests and model-generated output.
+- AI-generated study plans are suggestions and should be reviewed by the user.
+- Gemini availability and usage limits can affect plan generation.
+
+## Project Purpose
+
+FocusFlow demonstrates how an existing frontend application can be extended with a server-side AI feature, input and output validation, automated tests, and a production deployment.
