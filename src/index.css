@@ -761,3 +761,61 @@ body {
 
   .task-card__actions { flex-direction: column; gap: 0.15rem; }
 }
+
+/* Accessibility improvements: WCAG contrast */
+:root {
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #4b5563;
+
+  /* Darker priority colors for readable text */
+  --color-priority-low: #1d4ed8;
+  --color-priority-low-bg: #dbeafe;
+
+  --color-priority-medium: #92400e;
+  --color-priority-medium-bg: #fef3c7;
+
+  --color-priority-high: #b91c1c;
+  --color-priority-high-bg: #fee2e2;
+}
+
+/* Keep completed task text readable */
+.task-card--completed {
+  opacity: 1;
+}
+
+.task-card--completed .task-card__title {
+  color: #4b5563;
+}
+
+/* Make optional labels and helper text readable */
+.optional-mark,
+.form-hint,
+.study-planner__empty-hint,
+.empty-state__hint,
+.app-footer {
+  color: #4b5563;
+}
+
+/* Improve contrast for task metadata */
+.task-subject,
+.task-due,
+.task-card__meta {
+  color: #374151;
+}
+
+/* Ensure inactive filter counts remain readable */
+.filter-tab:not(.filter-tab--active) .filter-tab__count {
+  color: #374151;
+}
+
+/* Keep icon controls visible */
+.icon-btn {
+  color: #4b5563;
+}
+
+/* Disabled controls should remain legible */
+.btn:disabled {
+  opacity: 1;
+  color: #374151;
+  background-color: #e5e7eb;
+}
