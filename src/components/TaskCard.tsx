@@ -22,9 +22,7 @@ export default function TaskCard({
   onDelete,
 }: TaskCardProps) {
   const overdue =
-    !task.completed &&
-    Boolean(task.dueDate) &&
-    isOverdue(task.dueDate!);
+    !task.completed && task.dueDate && isOverdue(task.dueDate);
 
   return (
     <article
@@ -54,9 +52,7 @@ export default function TaskCard({
         <div className="task-card__meta">
           <span className="task-subject">{task.subject}</span>
 
-          <span
-            className={`task-priority task-priority--${task.priority}`}
-          >
+          <span className={`task-priority task-priority--${task.priority}`}>
             {PRIORITY_LABELS[task.priority]}
           </span>
 
@@ -76,7 +72,6 @@ export default function TaskCard({
       <div className="task-card__actions">
         {!task.completed && (
           <button
-            type="button"
             className="icon-btn icon-btn--edit"
             onClick={() => onEdit(task.id)}
             aria-label={`Edit task: ${task.title}`}
@@ -101,14 +96,9 @@ export default function TaskCard({
         )}
 
         <button
-          type="button"
           className="icon-btn icon-btn--delete"
           onClick={() => {
-            if (
-              window.confirm(
-                `Delete "${task.title}"? This cannot be undone.`
-              )
-            ) {
+            if (window.confirm(`Delete "${task.title}"? This cannot be undone.`)) {
               onDelete(task.id);
             }
           }}
