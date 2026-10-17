@@ -1,68 +1,58 @@
+
 /**
  * Vercel serverless function: POST /api/study-plan
  *
- * â”€â”€â”€ API CONTRACT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ * API contract:
+ * POST /api/study-plan
  *
- * REQUEST  POST /api/study-plan
- * Headers  Content-Type: application/json
- * Body     StudyPlanRequest (see type below)
- *
- * RESPONSE 200  StudyPlanResponse  â€“ structured study plan from Gemini
- *          400  ErrorResponse      â€“ bad request (validation failure)
- *          405  ErrorResponse      â€“ method not allowed
- *          500  ErrorResponse      â€“ server / model error (safe message only)
- *
- * â”€â”€â”€ REQUEST SHAPE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ * Request:
  * {
  *   tasks: Array<{
- *     id:        string           // opaque identifier; echoed back in plan
- *     title:     string           // task description (max 200 chars)
- *     subject:   string           // subject / topic (max 100 chars)
- *     priority:  "low" | "medium" | "high"
- *     dueDate?:  string           // YYYY-MM-DD or omitted
- *     completed: boolean          // completed tasks are excluded from plan
- *   }>
- *   availableHours: number        // study time available: 0.5 â€“ 24
+ *     id: string;
+ *     title: string;
+ *     subject: string;
+ *     priority: "low" | "medium" | "high";
+ *     dueDate?: string;
+ *     completed: boolean;
+ *   }>;
+ *   availableHours: number;
  * }
  *
- * â”€â”€â”€ RESPONSE SHAPE (200) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ * Success response:
  * {
  *   plan: Array<{
- *     taskId:          string     // matches an id from the request tasks array
- *     title:           string     // task title (echoed or summarised)
- *     subject:         string
- *     allocatedMinutes: number   // > 0, sum â‰¤ availableHours * 60
- *     rationale:       string    // one-sentence explanation of slot choice
- *     suggestedOrder:  number    // 1-based order in which to work on tasks
- *   }>
- *   summary: string              // one-paragraph overview of the plan
+ *     taskId: string;
+ *     title: string;
+ *     subject: string;
+ *     allocatedMinutes: number;
+ *     rationale: string;
+ *     suggestedOrder: number;
+ *   }>;
+ *   summary: string;
  * }
  *
- * â”€â”€â”€ ERROR RESPONSE SHAPE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
- * { error: string }
- *
- * â”€â”€â”€ SECURITY NOTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
- * â€¢ GEMINI_API_KEY is read from process.env only â€“ never from VITE_ variables.
- * â€¢ Stack traces and raw exceptions are never forwarded to the client.
- * â€¢ Input is length-capped and type-checked before reaching the model.
- * â€¢ Model output is structurally validated before being forwarded to the client.
+ * Security:
+ * - GEMINI_API_KEY is read only from process.env.
+ * - Secrets and stack traces are never returned to the client.
+ * - Input is validated before calling Gemini.
+ * - Model output is validated before being returned.
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GoogleGenAI } from "@google/genai";
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
+// Constants
 const MODEL = "gemini-3.5-flash";
 const MAX_TASKS = 30;
 const MAX_TITLE_LEN = 200;
 const MAX_SUBJECT_LEN = 100;
 const MIN_HOURS = 0.5;
 const MAX_HOURS = 24;
+const MAX_ATTEMPTS = 3;
+
 const VALID_PRIORITIES = new Set(["low", "medium", "high"]);
 
-// â”€â”€â”€ Input types (mirrors src/types.ts Task, but only the fields we need) â”€â”€â”€â”€
-
+// Request types
 interface RequestTask {
   id: string;
   title: string;
@@ -77,8 +67,7 @@ interface StudyPlanRequest {
   availableHours: number;
 }
 
-// â”€â”€â”€ Output types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
+// Response types
 interface PlanItem {
   taskId: string;
   title: string;
@@ -93,52 +82,68 @@ interface StudyPlanResponse {
   summary: string;
 }
 
-// â”€â”€â”€ Validation helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-function isString(v: unknown): v is string {
-  return typeof v === "string";
+// Validation helpers
+function isString(value: unknown): value is string {
+  return typeof value === "string";
 }
 
-function isNonEmptyString(v: unknown): v is string {
-  return isString(v) && v.trim().length > 0;
+function isNonEmptyString(value: unknown): value is string {
+  return isString(value) && value.trim().length > 0;
 }
 
-function isBoolean(v: unknown): v is boolean {
-  return typeof v === "boolean";
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === "boolean";
 }
 
-function isFiniteNumber(v: unknown): v is number {
-  return typeof v === "number" && Number.isFinite(v);
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
-/** Returns an error message string or null if the task is valid. */
 function validateTask(task: unknown, index: number): string | null {
   if (typeof task !== "object" || task === null) {
     return `tasks[${index}] must be an object`;
   }
+
   const t = task as Record<string, unknown>;
 
-  if (!isNonEmptyString(t.id))
+  if (!isNonEmptyString(t.id)) {
     return `tasks[${index}].id must be a non-empty string`;
-  if (!isNonEmptyString(t.title))
+  }
+
+  if (!isNonEmptyString(t.title)) {
     return `tasks[${index}].title must be a non-empty string`;
-  if ((t.title as string).length > MAX_TITLE_LEN)
+  }
+
+  if (t.title.length > MAX_TITLE_LEN) {
     return `tasks[${index}].title exceeds ${MAX_TITLE_LEN} characters`;
-  if (!isNonEmptyString(t.subject))
+  }
+
+  if (!isNonEmptyString(t.subject)) {
     return `tasks[${index}].subject must be a non-empty string`;
-  if ((t.subject as string).length > MAX_SUBJECT_LEN)
+  }
+
+  if (t.subject.length > MAX_SUBJECT_LEN) {
     return `tasks[${index}].subject exceeds ${MAX_SUBJECT_LEN} characters`;
-  if (!isString(t.priority) || !VALID_PRIORITIES.has(t.priority))
+  }
+
+  if (
+    !isString(t.priority) ||
+    !VALID_PRIORITIES.has(t.priority)
+  ) {
     return `tasks[${index}].priority must be "low", "medium", or "high"`;
-  if (!isBoolean(t.completed))
+  }
+
+  if (!isBoolean(t.completed)) {
     return `tasks[${index}].completed must be a boolean`;
-  if (t.dueDate !== undefined && !isString(t.dueDate))
+  }
+
+  if (t.dueDate !== undefined && !isString(t.dueDate)) {
     return `tasks[${index}].dueDate must be a string if provided`;
+  }
 
   return null;
 }
 
-/** Returns a validated StudyPlanRequest or throws with a user-readable message. */
 function validateBody(body: unknown): StudyPlanRequest {
   if (typeof body !== "object" || body === null) {
     throw new Error("Request body must be a JSON object");
@@ -149,22 +154,31 @@ function validateBody(body: unknown): StudyPlanRequest {
   if (!Array.isArray(b.tasks)) {
     throw new Error('"tasks" must be an array');
   }
+
   if (b.tasks.length === 0) {
     throw new Error('"tasks" must contain at least one task');
   }
+
   if (b.tasks.length > MAX_TASKS) {
     throw new Error(`"tasks" must not exceed ${MAX_TASKS} items`);
   }
 
   for (let i = 0; i < b.tasks.length; i++) {
-    const err = validateTask(b.tasks[i], i);
-    if (err) throw new Error(err);
+    const error = validateTask(b.tasks[i], i);
+
+    if (error) {
+      throw new Error(error);
+    }
   }
 
   if (!isFiniteNumber(b.availableHours)) {
     throw new Error('"availableHours" must be a number');
   }
-  if (b.availableHours < MIN_HOURS || b.availableHours > MAX_HOURS) {
+
+  if (
+    b.availableHours < MIN_HOURS ||
+    b.availableHours > MAX_HOURS
+  ) {
     throw new Error(
       `"availableHours" must be between ${MIN_HOURS} and ${MAX_HOURS}`
     );
@@ -176,36 +190,62 @@ function validateBody(body: unknown): StudyPlanRequest {
   };
 }
 
-// â”€â”€â”€ Model output validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Model output validation
+function validatePlanItem(
+  item: unknown,
+  taskIds: Set<string>
+): string | null {
+  if (typeof item !== "object" || item === null) {
+    return "plan item must be an object";
+  }
 
-/** Validates a single plan item from the model. Returns an error string or null. */
-function validatePlanItem(item: unknown, taskIds: Set<string>): string | null {
-  if (typeof item !== "object" || item === null) return "plan item must be an object";
   const p = item as Record<string, unknown>;
 
-  if (!isString(p.taskId) || !taskIds.has(p.taskId))
-    return `plan item taskId "${String(p.taskId)}" does not match any request task id`;
-  if (!isNonEmptyString(p.title)) return "plan item title must be a non-empty string";
-  if (!isNonEmptyString(p.subject)) return "plan item subject must be a non-empty string";
-  if (!isFiniteNumber(p.allocatedMinutes) || (p.allocatedMinutes as number) <= 0)
+  if (!isString(p.taskId) || !taskIds.has(p.taskId)) {
+    return "plan item taskId does not match any request task id";
+  }
+
+  if (!isNonEmptyString(p.title)) {
+    return "plan item title must be a non-empty string";
+  }
+
+  if (!isNonEmptyString(p.subject)) {
+    return "plan item subject must be a non-empty string";
+  }
+
+  if (
+    !isFiniteNumber(p.allocatedMinutes) ||
+    p.allocatedMinutes <= 0
+  ) {
     return "plan item allocatedMinutes must be a positive number";
-  if (!isNonEmptyString(p.rationale)) return "plan item rationale must be a non-empty string";
-  if (!isFiniteNumber(p.suggestedOrder) || !Number.isInteger(p.suggestedOrder) || (p.suggestedOrder as number) < 1)
+  }
+
+  if (!isNonEmptyString(p.rationale)) {
+    return "plan item rationale must be a non-empty string";
+  }
+
+  if (
+    !isFiniteNumber(p.suggestedOrder) ||
+    !Number.isInteger(p.suggestedOrder) ||
+    p.suggestedOrder < 1
+  ) {
     return "plan item suggestedOrder must be a positive integer";
+  }
 
   return null;
 }
 
-/** Parses and validates the raw JSON string returned by Gemini. */
 function parseModelOutput(
   raw: string | undefined,
-  taskIds: Set<string>
+  taskIds: Set<string>,
+  availableMinutes: number
 ): StudyPlanResponse {
   if (!raw || raw.trim() === "") {
     throw new Error("Model returned an empty response");
   }
 
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(raw);
   } catch {
@@ -222,9 +262,21 @@ function parseModelOutput(
     throw new Error('Model JSON must contain a non-empty "plan" array');
   }
 
+  let totalMinutes = 0;
+
   for (let i = 0; i < obj.plan.length; i++) {
-    const err = validatePlanItem(obj.plan[i], taskIds);
-    if (err) throw new Error(`plan[${i}]: ${err}`);
+    const item = obj.plan[i];
+    const error = validatePlanItem(item, taskIds);
+
+    if (error) {
+      throw new Error(`plan[${i}]: ${error}`);
+    }
+
+    totalMinutes += (item as PlanItem).allocatedMinutes;
+  }
+
+  if (totalMinutes > availableMinutes) {
+    throw new Error("Model allocated more time than the available study time");
   }
 
   if (!isNonEmptyString(obj.summary)) {
@@ -233,19 +285,19 @@ function parseModelOutput(
 
   return {
     plan: obj.plan as PlanItem[],
-    summary: obj.summary as string,
+    summary: obj.summary,
   };
 }
 
-// â”€â”€â”€ Prompt builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
+// Prompt builder
 function buildPrompt(req: StudyPlanRequest): string {
-  const activeTasks = req.tasks.filter((t) => !t.completed);
+  const activeTasks = req.tasks.filter((task) => !task.completed);
 
   const taskList = activeTasks
-    .map((t) => {
-      const due = t.dueDate ? `, due ${t.dueDate}` : "";
-      return `- id: "${t.id}" | "${t.title}" (${t.subject}, ${t.priority} priority${due})`;
+    .map((task) => {
+      const due = task.dueDate ? `, due ${task.dueDate}` : "";
+
+      return `- id: "${task.id}" | "${task.title}" (${task.subject}, ${task.priority} priority${due})`;
     })
     .join("\n");
 
@@ -257,32 +309,60 @@ Active tasks to plan:
 ${taskList}
 
 Create a realistic, prioritized study plan that:
-1. Allocates time only to the tasks listed above (use the exact task id values).
-2. Respects priority levels: high-priority tasks should generally receive more time or earlier slots.
-3. Accounts for due dates: tasks due sooner should be scheduled earlier.
-4. Keeps total allocatedMinutes across all plan items â‰¤ ${totalMinutes}.
-5. Assigns a brief, concrete rationale for each time allocation.
-6. Assigns suggestedOrder (1-based integer) indicating the recommended work sequence.
+1. Allocates time only to the tasks listed above, using their exact task IDs.
+2. Generally gives high-priority tasks more time or earlier slots.
+3. Schedules tasks with nearer due dates earlier.
+4. Keeps the total allocatedMinutes at or below ${totalMinutes}.
+5. Provides a brief, concrete rationale for each allocation.
+6. Uses suggestedOrder as a 1-based work sequence.
 7. Does not add tasks that are not in the input list.
+8. Uses positive integer values for allocatedMinutes.
 
-Respond with ONLY a JSON object in this exact shape, no markdown, no prose outside the JSON:
+Respond with ONLY a JSON object in this exact shape, with no markdown or extra prose:
 {
   "plan": [
     {
       "taskId": "<exact id from input>",
       "title": "<task title>",
       "subject": "<subject>",
-      "allocatedMinutes": <positive integer>,
+      "allocatedMinutes": 30,
       "rationale": "<one sentence>",
-      "suggestedOrder": <positive integer>
+      "suggestedOrder": 1
     }
   ],
   "summary": "<one paragraph overview of the plan>"
 }`;
 }
 
-// â”€â”€â”€ Handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Error helper for temporary Gemini availability failures
+function isTemporaryGeminiError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
 
+  const e = error as {
+    status?: unknown;
+    code?: unknown;
+    message?: unknown;
+    error?: {
+      code?: unknown;
+      status?: unknown;
+      message?: unknown;
+    };
+  };
+
+  const code = Number(e.status ?? e.code ?? e.error?.code);
+  const status = String(e.error?.status ?? e.status ?? "");
+  const message = String(e.error?.message ?? e.message ?? "");
+
+  return (
+    code === 503 ||
+    status === "UNAVAILABLE" ||
+    /high demand|temporarily unavailable|try again later/i.test(message)
+  );
+}
+
+// Handler
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -290,68 +370,117 @@ export default async function handler(
   // 1. Method guard
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    res.status(405).json({ error: "Method not allowed. Use POST." });
+    res.status(405).json({
+      error: "Method not allowed. Use POST.",
+    });
     return;
   }
 
-  // 2. API key guard (fail fast; never expose the key)
+  // 2. API key guard
   const apiKey = process.env.GEMINI_API_KEY;
+
   if (!apiKey) {
-    console.error("[study-plan] GEMINI_API_KEY environment variable is not set");
-    res.status(500).json({ error: "Server configuration error. Please try again later." });
+    console.error(
+      "[study-plan] GEMINI_API_KEY environment variable is not set"
+    );
+
+    res.status(500).json({
+      error: "Server configuration error. Please try again later.",
+    });
     return;
   }
 
-  // 3. Parse & validate request body
+  // 3. Parse and validate request
   let request: StudyPlanRequest;
+
   try {
-    validateBody(req.body); // throws with user-readable messages
-    request = req.body as StudyPlanRequest;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Invalid request body";
+    request = validateBody(req.body);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Invalid request body";
+
     res.status(400).json({ error: message });
     return;
   }
 
-  // 4. Filter out completed tasks â€” no point planning them
-  const activeTasks = request.tasks.filter((t) => !t.completed);
+  // 4. Exclude completed tasks
+  const activeTasks = request.tasks.filter((task) => !task.completed);
+
   if (activeTasks.length === 0) {
-    res.status(400).json({ error: "All supplied tasks are already completed. Add some active tasks to plan." });
-    return;
-  }
-
-  // 5. Call Gemini
-  let rawText: string | undefined;
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: buildPrompt(request),
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.4,  // low temperature for deterministic, structured output
-        maxOutputTokens: 2048,
-      },
+    res.status(400).json({
+      error:
+        "All supplied tasks are already completed. Add some active tasks to plan.",
     });
-
-    rawText = response.text;
-  } catch (err: unknown) {
-    // Log the real error server-side; return a safe message to the client
-    console.error("[study-plan] Gemini API call failed:", err);
-    res.status(500).json({ error: "Failed to generate study plan. Please try again." });
     return;
   }
 
-  // 6. Validate model output before forwarding to client
-  const taskIds = new Set(activeTasks.map((t) => t.id));
+  // 5. Call Gemini with retries for temporary availability failures
+  let rawText: string | undefined;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+
+      const response = await ai.models.generateContent({
+        model: MODEL,
+        contents: buildPrompt(request),
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.4,
+          maxOutputTokens: 2048,
+        },
+      });
+
+      rawText = response.text;
+      break;
+    } catch (error: unknown) {
+      const temporary = isTemporaryGeminiError(error);
+
+      console.error(
+        `[study-plan] Gemini request failed (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+        error
+      );
+
+      if (!temporary || attempt === MAX_ATTEMPTS) {
+        res.status(500).json({
+          error: temporary
+            ? "The AI service is temporarily busy. Please try again shortly."
+            : "Failed to generate study plan. Please try again.",
+        });
+        return;
+      }
+
+      // Retry after 1.2 seconds, then 2.4 seconds.
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1200 * attempt)
+      );
+    }
+  }
+
+  if (!rawText) {
+    res.status(500).json({
+      error: "Failed to generate study plan. Please try again.",
+    });
+    return;
+  }
+
+  // 6. Validate model output before returning it
+  const taskIds = new Set(activeTasks.map((task) => task.id));
   let studyPlan: StudyPlanResponse;
+
   try {
-    studyPlan = parseModelOutput(rawText, taskIds);
-  } catch (err: unknown) {
-    // Log the raw response server-side for debugging; never send it to the client
-    console.error("[study-plan] Model output validation failed:", err);
-    console.error("[study-plan] Raw model output:", rawText);
-    res.status(500).json({ error: "Received an unexpected response from the AI model. Please try again." });
+    studyPlan = parseModelOutput(
+      rawText,
+      taskIds,
+      Math.round(request.availableHours * 60)
+    );
+  } catch (error: unknown) {
+    console.error("[study-plan] Model output validation failed:", error);
+
+    // Do not log or return the raw model output.
+    res.status(500).json({
+      error: "Received an unexpected response from the AI model. Please try again.",
+    });
     return;
   }
 
